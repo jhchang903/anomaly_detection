@@ -1,0 +1,8 @@
+torch
+torchvision
+pytorch-msssim
+numpy
+Pillow
+matplotlib
+seaborn
+scikit-learn
