@@ -27,6 +27,10 @@ target_object = 'wood' # Must match training object
 MODEL_SAVE_DIR = './saved_models/' + target_object
 TEST_EPOCH = 100 # Must match the epoch of the saved model you want to load
 
+# Define postfix for model filename
+model_filename_prefix = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}_epoch{TEST_EPOCH}'
+
+
 # Ensure CUDA is available for GPU inference, otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -172,7 +176,8 @@ model = Autoencoder().to(device)
 
 # Load the trained model weights
 # You might need to adjust the epoch number here if you want to load a different saved model
-model_load_path = os.path.join(MODEL_SAVE_DIR, f'autoencoder_epoch_{TEST_EPOCH}.pth')
+model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_epoch{TEST_EPOCH}.pth')
+
 if os.path.exists(model_load_path):
     model.load_state_dict(torch.load(model_load_path))
     print(f"Loaded model from {model_load_path}")
@@ -204,7 +209,7 @@ plt.xlabel('Reconstruction Error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.grid(True)
-error_distribution_path = os.path.join(MODEL_SAVE_DIR, 'reconstruction_error_distribution.png')
+error_distribution_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_reconstruction_error_distribution.png')
 plt.savefig(error_distribution_path)
 plt.close()
 print(f"Saved plot to {error_distribution_path}")
@@ -226,7 +231,7 @@ plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic (ROC) Curve')
 plt.legend(loc='lower right')
 plt.grid(True)
-roc_curve_path = os.path.join(MODEL_SAVE_DIR, 'roc_curve.png')
+roc_curve_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_roc_curve.png')
 plt.savefig(roc_curve_path)
 plt.close()
 print(f"Saved plot to {roc_curve_path}")
@@ -247,7 +252,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.title('Confusion Matrix')
-confusion_matrix_path = os.path.join(MODEL_SAVE_DIR, 'confusion_matrix.png')
+confusion_matrix_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_confusion_matrix.png')
 plt.savefig(confusion_matrix_path)
 plt.close()
 print(f"Saved plot to {confusion_matrix_path}")
@@ -291,7 +296,7 @@ visualize_filtered_reconstructions(
     detected_as_good_originals,
     detected_as_good_reconstructions,
     detected_as_good_errors,
-    save_path=os.path.join(MODEL_SAVE_DIR, 'false_negatives.png'),
+    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_negatives.png'),
     num_images=5, # Display up to 5 such images
     title="Anomaly Images Detected as 'Good' (False Negatives)"
 )
@@ -317,7 +322,7 @@ visualize_filtered_reconstructions(
     detected_as_anomaly_originals,
     detected_as_anomaly_reconstructions,
     detected_as_anomaly_errors,
-    save_path=os.path.join(MODEL_SAVE_DIR, 'false_positives.png'),
+    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Detected as 'Anomaly' (False Positives)"
 )

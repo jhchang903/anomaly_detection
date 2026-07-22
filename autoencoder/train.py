@@ -27,6 +27,9 @@ target_object = 'wood' # Change this to the object you want to train on (e.g., '
 MODEL_SAVE_DIR = './saved_models/' + target_object
 os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
+# Define postfix for model filename
+model_filename_prefix = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}'
+
 # Ensure CUDA is available for GPU training, otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -90,7 +93,7 @@ for epoch in range(EPOCHS):
 
     # Save model every 10 epochs
     if (epoch + 1) % 10 == 0:
-        model_path = os.path.join(MODEL_SAVE_DIR, f'autoencoder_epoch{epoch+1}_{target_object}.pth')
+        model_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_epoch{epoch+1}.pth')
         torch.save(model.state_dict(), model_path)
         print(f"Model saved to {model_path}")
 
@@ -104,4 +107,6 @@ plt.xlabel('Epoch')
 plt.ylabel(loss_ylabel)
 plt.legend()
 plt.grid(True)
-plt.show()
+loss_plot_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_training_loss.png')
+plt.savefig(loss_plot_path)
+print(f"Saved training loss plot to {loss_plot_path}")
