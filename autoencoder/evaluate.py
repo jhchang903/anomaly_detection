@@ -23,13 +23,18 @@ LOSS_FUNCTION_TYPE = 'l2' # 'l2' for MSE, 'ssim' for SSIM-based loss
 
 # Data specific configuration
 target_object = 'wood' # Must match training object
+detect_category = '' # default: empty string, '' for all anomalies, or specify an anomaly type 
 
 # Define directory for saving models
 MODEL_SAVE_DIR = './saved_models/' + target_object
 TEST_EPOCH = 50 # Must match the epoch of the saved model you want to load
 
 # Define postfix for model filename
-model_filename_prefix = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}_epoch{TEST_EPOCH}'
+model_filename = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}_epoch{TEST_EPOCH}'
+if detect_category:
+    model_filename_prefix = f'{model_filename}_{detect_category}'
+else:
+    model_filename_prefix = model_filename
 
 # Set up logging to both console and a log file alongside the saved models
 os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
@@ -160,7 +165,7 @@ test_good_loader = DataLoader(test_good_dataset, batch_size=BATCH_SIZE, shuffle=
 test_dir = os.path.join(base_dir, 'test')
 anomaly_subdirs_to_display = [
     d for d in os.listdir(test_dir)
-    if os.path.isdir(os.path.join(test_dir, d)) and d != 'good'
+    if os.path.isdir(os.path.join(test_dir, d)) and d != 'good' if detect_category == '' or d == detect_category
 ]
 
 # Load each anomaly (defect) type as its own dataset/loader, keyed by subtype name,
@@ -192,7 +197,7 @@ model = Autoencoder().to(device)
 
 # Load the trained model weights
 # You might need to adjust the epoch number here if you want to load a different saved model
-model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}.pth')
+model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename}.pth')
 
 if os.path.exists(model_load_path):
     model.load_state_dict(torch.load(model_load_path))
