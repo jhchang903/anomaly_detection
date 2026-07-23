@@ -16,8 +16,8 @@ from dataset import MVTecDataset
 IMG_HEIGHT = 256
 IMG_WIDTH = 256
 BATCH_SIZE = 32
-EPOCHS = 100
-LEARNING_RATE = 0.001
+EPOCHS = 50
+LEARNING_RATE = 0.0002
 LOSS_FUNCTION_TYPE = 'l2' # 'l2' for MSE, 'ssim' for SSIM-based loss
 
 # Data specific configuration

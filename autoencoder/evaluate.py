@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import os
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -25,15 +26,27 @@ target_object = 'wood' # Must match training object
 
 # Define directory for saving models
 MODEL_SAVE_DIR = './saved_models/' + target_object
-TEST_EPOCH = 100 # Must match the epoch of the saved model you want to load
+TEST_EPOCH = 50 # Must match the epoch of the saved model you want to load
 
 # Define postfix for model filename
 model_filename_prefix = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}_epoch{TEST_EPOCH}'
 
+# Set up logging to both console and a log file alongside the saved models
+os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
+log_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_evaluate.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[
+        logging.FileHandler(log_path),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 # Ensure CUDA is available for GPU inference, otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 # Define transformations (must match training)
 transform = transforms.Compose([
@@ -105,7 +118,7 @@ def get_reconstructions_and_errors_for_dataset(dataloader, model, device, loss_t
 # Helper function to visualize a list of original, reconstructed, and error images
 def visualize_filtered_reconstructions(original_imgs, reconstructed_imgs, errors, save_path, num_images=5, title=""):
     if not original_imgs:
-        print(f"No images to visualize for {title}.")
+        logger.info(f"No images to visualize for {title}.")
         return
 
     num_to_display = min(num_images, len(original_imgs))
@@ -131,11 +144,11 @@ def visualize_filtered_reconstructions(original_imgs, reconstructed_imgs, errors
         plt.title(f"Error ({errors[i]:.4f})")
         plt.axis('off')
 
-    plt.suptitle(title, fontsize=16, y=1.02)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig(save_path)
+    plt.suptitle(title, fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.93])
+    plt.savefig(save_path, bbox_inches='tight')
     plt.close()
-    print(f"Saved plot to {save_path}")
+    logger.info(f"Saved plot to {save_path}")
 
 # Load test 'good' images
 base_dir = '/content/mvtec/' + target_object
@@ -161,28 +174,31 @@ for subdir in anomaly_subdirs_to_display:
         anomaly_dataset = MVTecDataset(root_dir=current_anomaly_dir, transform=transform)
         anomaly_loaders_by_type[subdir] = DataLoader(anomaly_dataset, batch_size=BATCH_SIZE, shuffle=False)
     else:
-        print(f"Warning: Anomaly directory not found: {current_anomaly_dir}")
+        logger.warning(f"Anomaly directory not found: {current_anomaly_dir}")
 
-print(f"Number of test good images: {len(test_good_dataset)}")
+
+dict_type_num = {}
+logger.info(f"Number of test good images: {len(test_good_dataset)}")
 if anomaly_loaders_by_type:
     for subtype, loader in anomaly_loaders_by_type.items():
-        print(f"Number of test '{subtype}' anomaly images: {len(loader.dataset)}")
-    print(f"Number of combined test anomaly images: {sum(len(loader.dataset) for loader in anomaly_loaders_by_type.values())}")
+        logger.info(f"Number of test '{subtype}' anomaly images: {len(loader.dataset)}")
+        dict_type_num[subtype] = len(loader.dataset)
+    logger.info(f"Number of combined test anomaly images: {sum(len(loader.dataset) for loader in anomaly_loaders_by_type.values())}")
 else:
-    print("No anomaly datasets were loaded.")
+    logger.info("No anomaly datasets were loaded.")
 
 # Instantiate the model and move to device
 model = Autoencoder().to(device)
 
 # Load the trained model weights
 # You might need to adjust the epoch number here if you want to load a different saved model
-model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_epoch{TEST_EPOCH}.pth')
+model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}.pth')
 
 if os.path.exists(model_load_path):
     model.load_state_dict(torch.load(model_load_path))
-    print(f"Loaded model from {model_load_path}")
+    logger.info(f"Loaded model from {model_load_path}")
 else:
-    print(f"Error: Model not found at {model_load_path}. Please ensure training was successful.")
+    logger.error(f"Model not found at {model_load_path}. Please ensure training was successful.")
     exit()
 
 # Calculate errors for good test images
@@ -195,10 +211,10 @@ anomaly_errors_by_type = {
 }
 anomaly_errors = np.concatenate(list(anomaly_errors_by_type.values())) if anomaly_errors_by_type else np.array([])
 
-print(f"Mean reconstruction error for good images: {np.mean(good_errors):.4f}")
+logger.info(f"Mean reconstruction error for good images: {np.mean(good_errors):.4f}")
 for subtype, errors in anomaly_errors_by_type.items():
-    print(f"Mean reconstruction error for '{subtype}' anomaly images: {np.mean(errors):.4f} (n={len(errors)})")
-print(f"Mean reconstruction error for anomaly images (all types combined): {np.mean(anomaly_errors):.4f}")
+    logger.info(f"Mean reconstruction error for '{subtype}' anomaly images: {np.mean(errors):.4f} (n={len(errors)})")
+logger.info(f"Mean reconstruction error for anomaly images (all types combined): {np.mean(anomaly_errors):.4f}")
 
 # Visualize Reconstruction Error Distribution
 plt.figure(figsize=(10, 6))
@@ -212,7 +228,7 @@ plt.grid(True)
 error_distribution_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_reconstruction_error_distribution.png')
 plt.savefig(error_distribution_path)
 plt.close()
-print(f"Saved plot to {error_distribution_path}")
+logger.info(f"Saved plot to {error_distribution_path}")
 
 # Determine Optimal Anomaly Threshold (ROC Curve)
 y_true = np.concatenate((np.zeros(len(good_errors)), np.ones(len(anomaly_errors))))
@@ -234,13 +250,13 @@ plt.grid(True)
 roc_curve_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_roc_curve.png')
 plt.savefig(roc_curve_path)
 plt.close()
-print(f"Saved plot to {roc_curve_path}")
+logger.info(f"Saved plot to {roc_curve_path}")
 
-print(f"Area Under the Curve (AUC): {roc_auc:.4f}")
+logger.info(f"Area Under the Curve (AUC): {roc_auc:.4f}")
 
 optimal_idx = np.argmax(tpr - fpr)
 optimal_threshold = thresholds[optimal_idx]
-print(f"Optimal anomaly threshold: {optimal_threshold:.4f}")
+logger.info(f"Optimal anomaly threshold: {optimal_threshold:.4f}")
 
 # Visualize Confusion Matrix
 y_pred = (y_scores > optimal_threshold).astype(int)
@@ -255,10 +271,9 @@ plt.title('Confusion Matrix')
 confusion_matrix_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_confusion_matrix.png')
 plt.savefig(confusion_matrix_path)
 plt.close()
-print(f"Saved plot to {confusion_matrix_path}")
+logger.info(f"Saved plot to {confusion_matrix_path}")
 
-print("\nClassification Report:")
-print(classification_report(y_true, y_pred, target_names=['Normal', 'Anomaly']))
+logger.info("Classification Report:\n" + classification_report(y_true, y_pred, target_names=['Normal', 'Anomaly']))
 
 
 # 1. Get original, reconstructed images and errors per anomaly type, then pool them
@@ -287,11 +302,11 @@ detected_as_good_reconstructions = [anomaly_reconstructions[i] for i in false_ne
 detected_as_good_errors = [anomaly_errors_full[i] for i in false_negatives_indices]
 detected_as_good_subtypes = [anomaly_subtype_labels[i] for i in false_negatives_indices]
 
-print(f"Found {len(detected_as_good_originals)} anomaly images detected as 'good' (error <= {optimal_threshold:.4f}).")
+logger.info(f"Found {len(detected_as_good_originals)} anomaly images detected as 'good' (error <= {optimal_threshold:.4f}).")
 for subtype in sorted(set(detected_as_good_subtypes)):
-    print(f"  - {detected_as_good_subtypes.count(subtype)} from '{subtype}'")
+    logger.info(f"  - {detected_as_good_subtypes.count(subtype)} from '{subtype}' (total {dict_type_num.get(subtype, 0)} images in test set)")
 
-# 4. Visualize these filtered anomaly images (false positives)
+# 4. Visualize these filtered anomaly images (false negatives)
 visualize_filtered_reconstructions(
     detected_as_good_originals,
     detected_as_good_reconstructions,
@@ -315,7 +330,7 @@ detected_as_anomaly_originals = [good_originals[i] for i in false_positives_indi
 detected_as_anomaly_reconstructions = [good_reconstructions[i] for i in false_positives_indices]
 detected_as_anomaly_errors = [good_errors_full[i] for i in false_positives_indices]
 
-print(f"Found {len(detected_as_anomaly_originals)} good images detected as 'anomaly' (error > {optimal_threshold:.4f}).")
+logger.info(f"Found {len(detected_as_anomaly_originals)} good images detected as 'anomaly' (error > {optimal_threshold:.4f}).")
 
 # 4. Visualize these filtered good images (false positives)
 visualize_filtered_reconstructions(
