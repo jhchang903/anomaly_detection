@@ -296,6 +296,30 @@ visualize_filtered_anomaly_maps(
     title="Anomaly Images Detected as 'Good' (False Negatives)"
 )
 
+# 5. Identify the indices where anomaly scores are > optimal_threshold
+# These are the anomaly images correctly classified as 'anomaly' (true positives)
+true_positives_indices = np.where(anomaly_scores_full > optimal_threshold)[0]
+
+# 6. Filter the images and scores based on these indices
+detected_as_anomaly_originals_tp = [anomaly_originals[i] for i in true_positives_indices]
+detected_as_anomaly_maps_tp = [anomaly_maps_all[i] for i in true_positives_indices]
+detected_as_anomaly_scores_tp = [anomaly_scores_full[i] for i in true_positives_indices]
+detected_as_anomaly_subtypes_tp = [anomaly_subtype_labels[i] for i in true_positives_indices]
+
+logger.info(f"Found {len(detected_as_anomaly_originals_tp)} anomaly images correctly detected as 'anomaly' (True Positives, score > {optimal_threshold:.4f}).")
+for subtype in sorted(set(detected_as_anomaly_subtypes_tp)):
+    logger.info(f"  - {detected_as_anomaly_subtypes_tp.count(subtype)} from '{subtype}' (total {dict_type_num.get(subtype, 0)} images in test set)")
+
+# 7. Visualize these filtered anomaly images (true positives)
+visualize_filtered_anomaly_maps(
+    detected_as_anomaly_originals_tp,
+    detected_as_anomaly_maps_tp,
+    detected_as_anomaly_scores_tp,
+    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_positives.png'),
+    num_images=5, # Display up to 5 such images
+    title="Anomaly Images Correctly Detected as 'Anomaly' (True Positives)"
+)
+
 # 1. Get original images, anomaly maps and scores for the entire good test dataset
 good_originals, good_maps, good_scores_full = get_scores_and_maps_for_dataset(test_good_loader, model, device)
 
@@ -318,4 +342,25 @@ visualize_filtered_anomaly_maps(
     save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Detected as 'Anomaly' (False Positives)"
+)
+
+# 2. Identify the indices where good scores are <= optimal_threshold
+# These are the good images correctly classified as 'good' (true negatives)
+true_negatives_indices = np.where(good_scores_full <= optimal_threshold)[0]
+
+# 3. Filter the images and scores based on these indices
+detected_as_good_originals_tn = [good_originals[i] for i in true_negatives_indices]
+detected_as_good_maps_tn = [good_maps[i] for i in true_negatives_indices]
+detected_as_good_scores_tn = [good_scores_full[i] for i in true_negatives_indices]
+
+logger.info(f"Found {len(detected_as_good_originals_tn)} good images correctly classified as 'good' (True Negatives, score <= {optimal_threshold:.4f}).")
+
+# 4. Visualize these filtered good images (true negatives)
+visualize_filtered_anomaly_maps(
+    detected_as_good_originals_tn,
+    detected_as_good_maps_tn,
+    detected_as_good_scores_tn,
+    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_negatives.png'),
+    num_images=5, # Display up to 5 such images
+    title="Good Images Correctly Classified as 'Good' (True Negatives)"
 )
