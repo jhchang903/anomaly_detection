@@ -6,6 +6,7 @@ import os
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 from sklearn.metrics import roc_curve, auc, confusion_matrix, classification_report
 import seaborn as sns
@@ -21,25 +22,30 @@ IMG_WIDTH = 256
 BATCH_SIZE = 32
 LOSS_FUNCTION_TYPE = 'l2' # 'l2' for MSE, 'ssim' for SSIM-based loss
 LATENT_DIM = 128
+KL_WEIGHT = 1.0 # Must match train.py -- only used to reconstruct the model folder path
 
 # Data specific configuration
 target_object = 'wood' # Must match training object
 detect_category = '' # default: empty string, '' for all anomalies, or specify an anomaly type
 
-# Define directory for saving models
-MODEL_SAVE_DIR = './saved_models/' + target_object
+# Config-level folder must match train.py's MODEL_SAVE_DIR for this hyperparameter
+# combination -- it holds every checkpoint (model10.pth, model20.pth, ...).
+MODEL_SAVE_DIR = os.path.join('./saved_models', target_object, f'vae_{LOSS_FUNCTION_TYPE}_latent{LATENT_DIM}_kl{KL_WEIGHT}')
 TEST_EPOCH = 50 # Must match the epoch of the saved model you want to load
 
-# Define postfix for model filename
-model_filename = f'vae_{target_object}_{LOSS_FUNCTION_TYPE}_epoch{TEST_EPOCH}'
+# Each evaluation run gets its own timestamped subfolder under MODEL_SAVE_DIR, so
+# repeated evaluations (different epochs/categories) never overwrite each other,
+# and every file inside a run folder uses the same fixed name across all model
+# families (autoencoder / VAE / PaDiM).
+run_folder_name = f'run_epoch{TEST_EPOCH}'
 if detect_category:
-    model_filename_prefix = f'{model_filename}_{detect_category}'
-else:
-    model_filename_prefix = model_filename
+    run_folder_name += f'_{detect_category}'
+run_folder_name += f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+RUN_DIR = os.path.join(MODEL_SAVE_DIR, run_folder_name)
+os.makedirs(RUN_DIR, exist_ok=True)
 
-# Set up logging to both console and a log file alongside the saved models
-os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
-log_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_evaluate.log')
+# Set up logging to both console and a log file inside this run's folder
+log_path = os.path.join(RUN_DIR, 'evaluate.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(message)s',
@@ -200,8 +206,7 @@ else:
 model = VAE(latent_dim=LATENT_DIM).to(device)
 
 # Load the trained model weights
-# You might need to adjust the epoch number here if you want to load a different saved model
-model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename}.pth')
+model_load_path = os.path.join(MODEL_SAVE_DIR, f'model{TEST_EPOCH}.pth')
 
 if os.path.exists(model_load_path):
     model.load_state_dict(torch.load(model_load_path))
@@ -234,7 +239,7 @@ plt.xlabel('Reconstruction Error')
 plt.ylabel('Frequency')
 plt.legend()
 plt.grid(True)
-error_distribution_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_reconstruction_error_distribution.png')
+error_distribution_path = os.path.join(RUN_DIR, 'score_distribution.png')
 plt.savefig(error_distribution_path)
 plt.close()
 logger.info(f"Saved plot to {error_distribution_path}")
@@ -256,7 +261,7 @@ plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic (ROC) Curve')
 plt.legend(loc='lower right')
 plt.grid(True)
-roc_curve_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_roc_curve.png')
+roc_curve_path = os.path.join(RUN_DIR, 'roc_curve.png')
 plt.savefig(roc_curve_path)
 plt.close()
 logger.info(f"Saved plot to {roc_curve_path}")
@@ -277,7 +282,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.title('Confusion Matrix')
-confusion_matrix_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_confusion_matrix.png')
+confusion_matrix_path = os.path.join(RUN_DIR, 'confusion_matrix.png')
 plt.savefig(confusion_matrix_path)
 plt.close()
 logger.info(f"Saved plot to {confusion_matrix_path}")
@@ -320,7 +325,7 @@ visualize_filtered_reconstructions(
     detected_as_good_originals,
     detected_as_good_reconstructions,
     detected_as_good_errors,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_negatives.png'),
+    save_path=os.path.join(RUN_DIR, 'false_negatives.png'),
     num_images=5, # Display up to 5 such images
     title="Anomaly Images Detected as 'Good' (False Negatives)"
 )
@@ -344,7 +349,7 @@ visualize_filtered_reconstructions(
     detected_as_anomaly_originals_tp,
     detected_as_anomaly_reconstructions_tp,
     detected_as_anomaly_errors_tp,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_positives.png'),
+    save_path=os.path.join(RUN_DIR, 'true_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Anomaly Images Correctly Detected as 'Anomaly' (True Positives)"
 )
@@ -370,7 +375,7 @@ visualize_filtered_reconstructions(
     detected_as_anomaly_originals,
     detected_as_anomaly_reconstructions,
     detected_as_anomaly_errors,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_positives.png'),
+    save_path=os.path.join(RUN_DIR, 'false_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Detected as 'Anomaly' (False Positives)"
 )
@@ -391,7 +396,7 @@ visualize_filtered_reconstructions(
     detected_as_good_originals_tn,
     detected_as_good_reconstructions_tn,
     detected_as_good_errors_tn,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_negatives.png'),
+    save_path=os.path.join(RUN_DIR, 'true_negatives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Correctly Classified as 'Good' (True Negatives)"
 )

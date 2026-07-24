@@ -5,6 +5,7 @@ import os
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 from sklearn.metrics import roc_curve, auc, confusion_matrix, classification_report
 import seaborn as sns
@@ -26,20 +27,24 @@ IMAGENET_STD = np.array([0.229, 0.224, 0.225])
 target_object = 'wood' # Must match training object
 detect_category = '' # default: empty string, '' for all anomalies, or specify an anomaly type
 
-# Define directory for saving models
-MODEL_SAVE_DIR = './saved_models/' + target_object
+# Config-level folder must match train.py's MODEL_SAVE_DIR for this hyperparameter
+# combination. Unlike the gradient-trained AE/VAE stages, PaDiM has no epochs --
+# fitting is a single pass that produces one artifact (model.pth).
+MODEL_SAVE_DIR = os.path.join('./saved_models', target_object, f'padim_dreduced{D_REDUCED}')
 
-# Define postfix for model filename. No epoch suffix -- PaDiM has no epochs,
-# see train.py.
-model_filename = f'padim_{target_object}'
+# Each evaluation run gets its own timestamped subfolder under MODEL_SAVE_DIR, so
+# repeated evaluations (different categories) never overwrite each other, and
+# every file inside a run folder uses the same fixed name across all model
+# families (autoencoder / VAE / PaDiM).
+run_folder_name = 'run'
 if detect_category:
-    model_filename_prefix = f'{model_filename}_{detect_category}'
-else:
-    model_filename_prefix = model_filename
+    run_folder_name += f'_{detect_category}'
+run_folder_name += f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+RUN_DIR = os.path.join(MODEL_SAVE_DIR, run_folder_name)
+os.makedirs(RUN_DIR, exist_ok=True)
 
-# Set up logging to both console and a log file alongside the saved models
-os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
-log_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_evaluate.log')
+# Set up logging to both console and a log file inside this run's folder
+log_path = os.path.join(RUN_DIR, 'evaluate.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(message)s',
@@ -174,7 +179,7 @@ else:
     logger.info("No anomaly datasets were loaded.")
 
 # Load the fitted model
-model_load_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename}.pth')
+model_load_path = os.path.join(MODEL_SAVE_DIR, 'model.pth')
 
 if os.path.exists(model_load_path):
     model = PaDiM.load(model_load_path, device=device)
@@ -207,7 +212,7 @@ plt.xlabel('Anomaly Score (max Mahalanobis distance)')
 plt.ylabel('Frequency')
 plt.legend()
 plt.grid(True)
-score_distribution_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_score_distribution.png')
+score_distribution_path = os.path.join(RUN_DIR, 'score_distribution.png')
 plt.savefig(score_distribution_path)
 plt.close()
 logger.info(f"Saved plot to {score_distribution_path}")
@@ -229,7 +234,7 @@ plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic (ROC) Curve')
 plt.legend(loc='lower right')
 plt.grid(True)
-roc_curve_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_roc_curve.png')
+roc_curve_path = os.path.join(RUN_DIR, 'roc_curve.png')
 plt.savefig(roc_curve_path)
 plt.close()
 logger.info(f"Saved plot to {roc_curve_path}")
@@ -250,7 +255,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.title('Confusion Matrix')
-confusion_matrix_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_confusion_matrix.png')
+confusion_matrix_path = os.path.join(RUN_DIR, 'confusion_matrix.png')
 plt.savefig(confusion_matrix_path)
 plt.close()
 logger.info(f"Saved plot to {confusion_matrix_path}")
@@ -291,7 +296,7 @@ visualize_filtered_anomaly_maps(
     detected_as_good_originals,
     detected_as_good_maps,
     detected_as_good_scores,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_negatives.png'),
+    save_path=os.path.join(RUN_DIR, 'false_negatives.png'),
     num_images=5, # Display up to 5 such images
     title="Anomaly Images Detected as 'Good' (False Negatives)"
 )
@@ -315,7 +320,7 @@ visualize_filtered_anomaly_maps(
     detected_as_anomaly_originals_tp,
     detected_as_anomaly_maps_tp,
     detected_as_anomaly_scores_tp,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_positives.png'),
+    save_path=os.path.join(RUN_DIR, 'true_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Anomaly Images Correctly Detected as 'Anomaly' (True Positives)"
 )
@@ -339,7 +344,7 @@ visualize_filtered_anomaly_maps(
     detected_as_anomaly_originals,
     detected_as_anomaly_maps,
     detected_as_anomaly_scores,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_false_positives.png'),
+    save_path=os.path.join(RUN_DIR, 'false_positives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Detected as 'Anomaly' (False Positives)"
 )
@@ -360,7 +365,7 @@ visualize_filtered_anomaly_maps(
     detected_as_good_originals_tn,
     detected_as_good_maps_tn,
     detected_as_good_scores_tn,
-    save_path=os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_true_negatives.png'),
+    save_path=os.path.join(RUN_DIR, 'true_negatives.png'),
     num_images=5, # Display up to 5 such images
     title="Good Images Correctly Classified as 'Good' (True Negatives)"
 )

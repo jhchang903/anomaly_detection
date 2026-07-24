@@ -23,12 +23,10 @@ LOSS_FUNCTION_TYPE = 'l2' # 'l2' for MSE, 'ssim' for SSIM-based loss
 # Data specific configuration
 target_object = 'wood' # Change this to the object you want to train on (e.g., 'transistor')
 
-# Define directory for saving models
-MODEL_SAVE_DIR = './saved_models/' + target_object
+# Define directory for saving models: one folder per hyperparameter combination,
+# holding every checkpoint for that combination (model10.pth, model20.pth, ...)
+MODEL_SAVE_DIR = os.path.join('./saved_models', target_object, f'autoencoder_{LOSS_FUNCTION_TYPE}')
 os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
-
-# Define postfix for model filename
-model_filename_prefix = f'autoencoder_{target_object}_{LOSS_FUNCTION_TYPE}'
 
 # Ensure CUDA is available for GPU training, otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -93,7 +91,7 @@ for epoch in range(EPOCHS):
 
     # Save model every 10 epochs
     if (epoch + 1) % 10 == 0:
-        model_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_epoch{epoch+1}.pth')
+        model_path = os.path.join(MODEL_SAVE_DIR, f'model{epoch+1}.pth')
         torch.save(model.state_dict(), model_path)
         print(f"Model saved to {model_path}")
 
@@ -107,6 +105,6 @@ plt.xlabel('Epoch')
 plt.ylabel(loss_ylabel)
 plt.legend()
 plt.grid(True)
-loss_plot_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}_training_loss.png')
+loss_plot_path = os.path.join(MODEL_SAVE_DIR, 'training_loss.png')
 plt.savefig(loss_plot_path)
 print(f"Saved training loss plot to {loss_plot_path}")

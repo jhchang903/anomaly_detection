@@ -18,14 +18,11 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 # Data specific configuration
 target_object = 'wood' # Change this to the object you want to train on (e.g., 'transistor')
 
-# Define directory for saving models
-MODEL_SAVE_DIR = './saved_models/' + target_object
+# Define directory for saving models: one folder per hyperparameter combination.
+# Unlike the gradient-trained AE/VAE stages, PaDiM has no epochs -- fitting is a
+# single pass over the training set that produces one artifact (model.pth).
+MODEL_SAVE_DIR = os.path.join('./saved_models', target_object, f'padim_dreduced{D_REDUCED}')
 os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
-
-# Define postfix for model filename. No epoch suffix -- unlike the
-# gradient-trained AE/VAE stages, PaDiM has no epochs: fitting is a single
-# pass over the training set that produces one artifact.
-model_filename_prefix = f'padim_{target_object}'
 
 # Ensure CUDA is available for GPU inference, otherwise use CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,6 +53,6 @@ print(f"Fitting PaDiM (backbone: resnet18, d_reduced={D_REDUCED}) on {len(train_
 model.fit(train_loader, device)
 print(f"Fitted patch grid: {model.grid_size[0]}x{model.grid_size[1]} positions")
 
-model_path = os.path.join(MODEL_SAVE_DIR, f'{model_filename_prefix}.pth')
+model_path = os.path.join(MODEL_SAVE_DIR, 'model.pth')
 model.save(model_path)
 print(f"Model saved to {model_path}")
